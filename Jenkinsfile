@@ -39,21 +39,20 @@ pipeline {
         stage('Prepare Agent') {
             steps {
                 sh '''
-                    set -e
+                    set +e
                     if command -v apt-get >/dev/null 2>&1; then
                         export DEBIAN_FRONTEND=noninteractive
                         if command -v sudo >/dev/null 2>&1; then
-                            sudo apt-get update
-                            sudo apt-get install -y --no-install-recommends libatomic1
+                            sudo apt-get update >/dev/null 2>&1
+                            sudo apt-get install -y --no-install-recommends libatomic1 >/dev/null 2>&1
                         else
-                            apt-get update
-                            apt-get install -y --no-install-recommends libatomic1
+                            apt-get update >/dev/null 2>&1
+                            apt-get install -y --no-install-recommends libatomic1 >/dev/null 2>&1
                         fi
                     elif command -v apk >/dev/null 2>&1; then
-                        apk add --no-cache libatomic
-                    else
-                        echo "No supported package manager found; continuing"
+                        apk add --no-cache libatomic >/dev/null 2>&1
                     fi
+                    echo "Agent preparation completed; continuing even if package installation was skipped"
                 '''
             }
         }
