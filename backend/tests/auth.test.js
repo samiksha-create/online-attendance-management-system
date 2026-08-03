@@ -15,16 +15,22 @@ const app = require('../server');
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+mongoServer = await MongoMemoryServer.create({
+    binary: {
+        version: "7.0.3"
+    }
+});
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
+    await mongoose.disconnect();
 
+    if (mongoServer) {
+        await mongoServer.stop();
+    }
+});
 describe('Health Check', () => {
   it('GET /api/health should return 200', async () => {
     const res = await request(app).get('/api/health');
