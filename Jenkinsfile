@@ -36,13 +36,35 @@ pipeline {
             }
         }
 
+        stage('Prepare Agent') {
+            steps {
+                sh '''
+                    set -e
+                    if command -v apt-get >/dev/null 2>&1; then
+                        export DEBIAN_FRONTEND=noninteractive
+                        if command -v sudo >/dev/null 2>&1; then
+                            sudo apt-get update
+                            sudo apt-get install -y --no-install-recommends libatomic1
+                        else
+                            apt-get update
+                            apt-get install -y --no-install-recommends libatomic1
+                        fi
+                    elif command -v apk >/dev/null 2>&1; then
+                        apk add --no-cache libatomic
+                    else
+                        echo "No supported package manager found; continuing"
+                    fi
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             parallel {
                 stage('Backend Dependencies') {
                     steps {
                         dir('backend') {
                             echo "Installing backend dependencies..."
-                            sh 'npm install'
+                            sh 'npm install --no-audit --no-fund'
                         }
                     }
                 }
@@ -50,7 +72,7 @@ pipeline {
                     steps {
                         dir('frontend') {
                             echo "Installing frontend dependencies..."
-                            sh 'npm install'
+                            sh 'npm install --no-audit --no-fund'
                         }
                     }
                 }
@@ -85,6 +107,11 @@ pipeline {
         }
 
         stage('Build Docker Images') {
+            when {
+                expression {
+                    return sh(script: 'command -v docker >/dev/null 2>&1 && command -v docker-compose >/dev/null 2>&1', returnStatus: true) == 0
+                }
+            }
             steps {
                 echo "Building Docker images for backend and frontend..."
                 sh "docker build -t ${BACKEND_IMAGE} ./backend"
@@ -93,6 +120,11 @@ pipeline {
         }
 
         stage('Run Containers') {
+            when {
+                expression {
+                    return sh(script: 'command -v docker >/dev/null 2>&1 && command -v docker-compose >/dev/null 2>&1', returnStatus: true) == 0
+                }
+            }
             steps {
                 echo "Deploying containers using Docker Compose..."
                 sh 'docker-compose down --remove-orphans || true'
@@ -119,8 +151,8 @@ pipeline {
             echo "Pipeline failed. Check the stage logs above for details."
         }
         always {
-            echo "Cleaning up dangling Docker images..."
-            sh 'docker image prune -f || true'
+            echo "Cleaning up dangling Docker images if Docker is available..."
+            sh 'if command -v docker >/dev/null 2>&1; then docker image prune -f || true; else echo "Docker not available on this agent"; fi'
         }
     }
 }
